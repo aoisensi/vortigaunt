@@ -22,6 +22,10 @@ func main() {
 		name = name[0 : len(name)-4]
 
 		fbx := fbx75.NewFBX()
+
+		fbx.GlobalSettings.UpAxis = fbx75.AxisYP
+		fbx.GlobalSettings.FrontAxis = fbx75.AxisXP
+
 		geometry := &fbx75.ObjectGeometry{
 			ID:   rand.Int63(),
 			Name: name,
@@ -29,18 +33,17 @@ func main() {
 		{
 			vertices := make([]float64, len(mdl.Vvd.Vertices)*3)
 			for i, v := range mdl.Vvd.Vertices {
-				for j := 0; j < 3; j++ {
-					vertices[i*3+j] = float64(v.Position[j])
+				for jm, jf := range []int{2, 0, 1} {
+					vertices[i*3+jf] = float64(v.Position[jm])
 				}
 			}
 			sg := mdl.Vtx.BodyParts[0].Models[0].LODS[0].Meshes[0].StripGroups[0]
 			indeces := make([]int32, len(sg.Indices))
-			for i, index := range sg.Indices {
-				id := int32(sg.Vertexes[index].OriginalMeshVertexID)
-				if i%3 == 2 {
-					id = ^id
-				}
-				indeces[i] = id
+			polygonNum := len(sg.Indices) / 3
+			for i := 0; i < polygonNum; i++ {
+				indeces[i*3+0] = int32(sg.Vertexes[sg.Indices[i*3+0]].OriginalMeshVertexID)
+				indeces[i*3+1] = int32(sg.Vertexes[sg.Indices[i*3+2]].OriginalMeshVertexID)
+				indeces[i*3+2] = ^int32(sg.Vertexes[sg.Indices[i*3+1]].OriginalMeshVertexID)
 			}
 			geometry.Vertices = vertices
 			geometry.PolygonVertexIndex = indeces
