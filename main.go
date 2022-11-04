@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/aoisensi/go-fbx/pkg/fbx75"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 func main() {
@@ -17,38 +18,81 @@ func main() {
 			continue
 		}
 		mdl := load(fname)
-		splitedName := strings.Split(string(mdl.Mdl.Header.Name[:]), "/")
+		textureName := mdl.Mdl.TextureNames[0]
+		longName := strings.TrimRight(string(mdl.Mdl.Header.Name[:]), "\x00")
+		splitedName := strings.Split(longName, "/")
 		name := splitedName[len(splitedName)-1]
 		name = name[0 : len(name)-4]
 
 		fbx := fbx75.NewFBX()
 
-		fbx.GlobalSettings.UpAxis = fbx75.AxisYP
-		fbx.GlobalSettings.FrontAxis = fbx75.AxisXP
+		material := &fbx75.Material{
+			ID:   rand.Int63(),
+			Name: textureName,
+		}
 
-		geometry := &fbx75.ObjectGeometry{
+		geometry := &fbx75.Geometry{
 			ID:   rand.Int63(),
 			Name: name,
 		}
 		{
-			vertices := make([]float64, len(mdl.Vvd.Vertices)*3)
-			for i, v := range mdl.Vvd.Vertices {
-				for jm, jf := range []int{2, 0, 1} {
-					vertices[i*3+jf] = float64(v.Position[jm])
+			verticesNum := len(mdl.Vvd.Vertices)
+			vertices := make([]float64, 0, verticesNum*3)
+			verticesMap := make(map[mgl32.Vec3]int, verticesNum)
+			indexIndex := make([]int, 0, verticesNum)
+			for _, v := range mdl.Vvd.Vertices {
+				if index, ok := verticesMap[v.Position]; ok {
+					indexIndex = append(indexIndex, index)
+				} else {
+					index := len(verticesMap)
+					indexIndex = append(indexIndex, index)
+					verticesMap[v.Position] = index
+					vp := src2fbxXYZ(v.Position)
+					vertices = append(vertices, vp[:]...)
 				}
 			}
-			sg := mdl.Vtx.BodyParts[0].Models[0].LODS[0].Meshes[0].StripGroups[0]
-			indeces := make([]int32, len(sg.Indices))
-			polygonNum := len(sg.Indices) / 3
-			for i := 0; i < polygonNum; i++ {
-				indeces[i*3+0] = int32(sg.Vertexes[sg.Indices[i*3+0]].OriginalMeshVertexID)
-				indeces[i*3+1] = int32(sg.Vertexes[sg.Indices[i*3+2]].OriginalMeshVertexID)
-				indeces[i*3+2] = ^int32(sg.Vertexes[sg.Indices[i*3+1]].OriginalMeshVertexID)
-			}
 			geometry.Vertices = vertices
+
+			sg := mdl.Vtx.BodyParts[0].Models[0].LODS[0].Meshes[0].StripGroups[0]
+			indecesNum := len(sg.Indices)
+			indeces := make([]int32, indecesNum)
+			uvs := make([]float64, 0, indecesNum*2)
+			polygonNum := indecesNum / 3
+			for i := 0; i < polygonNum; i++ {
+				for j := 0; j < 3; j++ {
+					v := sg.Vertexes[sg.Indices[i*3+j]]
+					vid := v.OriginalMeshVertexID
+
+					index := int32(indexIndex[vid])
+					if j == 2 {
+						index = ^index
+					}
+					indeces[i*3+j] = index
+
+					vv := mdl.Vvd.Vertices[vid]
+					uv := src2fbxUV(vv.UVs)
+					uvs = append(uvs, uv[:]...)
+				}
+			}
 			geometry.PolygonVertexIndex = indeces
+			geometry.LayerElementUV = &fbx75.LayerElementUV{
+				UV: uvs,
+			}
+			geometry.LayerElementMaterial = &fbx75.LayerElementMaterial{}
+			geometry.Layer = &fbx75.Layer{
+				LayerElements: []*fbx75.LayerElement{
+					{
+						Type:       "LayerElementUV",
+						TypedIndex: 0,
+					},
+					{
+						Type:       "LayerElementMaterial",
+						TypedIndex: 0,
+					},
+				},
+			}
 		}
-		model := &fbx75.ObjectModel{
+		model := &fbx75.Model{
 			ID:   rand.Int63(),
 			Name: name,
 		}
@@ -56,11 +100,13 @@ func main() {
 			fbx.Objects.Objects,
 			geometry,
 			model,
+			material,
 		)
 
 		fbx.Connections.Cs = []fbx75.C{
 			{model.ID, 0},
 			{geometry.ID, model.ID},
+			{material.ID, model.ID},
 		}
 
 		f, err := os.Create(fname[:len(fname)-4] + ".fbx")

@@ -7,7 +7,6 @@ import (
 
 	"github.com/galaco/studiomodel"
 	"github.com/galaco/studiomodel/mdl"
-	"github.com/galaco/studiomodel/phy"
 	"github.com/galaco/studiomodel/vtx"
 	"github.com/galaco/studiomodel/vvd"
 )
@@ -18,7 +17,7 @@ func load(mdlName string) *studiomodel.StudioModel {
 	model.Mdl = loadSingle(mdlName, mdl.ReadFromStream)
 	model.Vtx = loadSingle(name+".dx90.vtx", vtx.ReadFromStream)
 	model.Vvd = loadSingle(name+".vvd", vvd.ReadFromStream)
-	model.Phy = loadSingle(name+".phy", phy.ReadFromStream)
+	//model.Phy = loadSingle(name+".phy", phy.ReadFromStream)
 
 	return model
 }
