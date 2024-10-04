@@ -5,9 +5,11 @@ import (
 	"log"
 )
 
-func init() {
-	flag.Parse()
+var flagScale float64
 
+func init() {
+	flag.Float64Var(&flagScale, "scale", 0.02, "scale factor")
+	flag.Parse()
 }
 
 func Run() {

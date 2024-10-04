@@ -23,6 +23,8 @@ func convert(n string) error {
 
 	if len(m.MDL.BodyParts) > 0 {
 		positions := make([][3]float32, 0, len(m.VVD.Vertexes))
+		normals := make([][3]float32, 0, len(m.VVD.Vertexes))
+		texcoords := make([][2]float32, 0, len(m.VVD.Vertexes))
 
 		if len(m.VVD.Fixups) > 0 {
 			for _, fixup := range m.VVD.Fixups {
@@ -30,16 +32,32 @@ func convert(n string) error {
 				num := fixup.NumVertexes
 				for i := vid; i < vid+num; i++ {
 					p := vmath.Vec3ToGL(m.VVD.Vertexes[i].Position)
+					p = vmath.VecMulScalar(p, float32(flagScale))
 					positions = append(positions, p)
+
+					n := vmath.Vec3ToGL(m.VVD.Vertexes[i].Normal)
+					normals = append(normals, n)
+
+					t := m.VVD.Vertexes[i].TexCoord
+					texcoords = append(texcoords, [2]float32{t[0], t[1]})
 				}
 			}
 		} else {
 			for _, v := range m.VVD.Vertexes {
 				p := vmath.Vec3ToGL(v.Position)
+				p = vmath.VecMulScalar(p, float32(flagScale))
 				positions = append(positions, p)
+
+				n := vmath.Vec3ToGL(v.Normal)
+				normals = append(normals, n)
+
+				t := v.TexCoord
+				texcoords = append(texcoords, [2]float32{t[0], t[1]})
 			}
 		}
-		posID := modeler.WritePosition(document, positions)
+		positionID := modeler.WritePosition(document, positions)
+		normalID := modeler.WriteNormal(document, normals)
+		texcoordID := modeler.WriteTextureCoord(document, texcoords)
 
 		for bpID, mdlBP := range m.MDL.BodyParts {
 			vtxBP := m.VTX.BodyParts[bpID]
@@ -55,7 +73,9 @@ func convert(n string) error {
 				for meshID, mdlMesh := range mdlModel.Meshes {
 					primitive := &gltf.Primitive{
 						Attributes: map[string]int{
-							"POSITION": posID,
+							"POSITION":   positionID,
+							"NORMAL":     normalID,
+							"TEXCOORD_0": texcoordID,
 						},
 					}
 					vtxMesh := vtxModel.LODs[0].Meshes[meshID]
