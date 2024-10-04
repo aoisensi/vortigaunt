@@ -21,6 +21,24 @@ func convert(n string) error {
 	scene := document.Scenes[0]
 	scene.Name = strings.TrimRight(filepath.Base(m.MDL.Name), ".mdl")
 
+	// Bones
+	if !m.MDL.Header.Flags.IsStaticProp() {
+		boneNodes := make([]*gltf.Node, len(m.MDL.Bones))
+		for i, mdlBone := range m.MDL.Bones {
+			node := &gltf.Node{
+				Name:        mdlBone.Name,
+				Translation: vmath.FtoD3(vmath.VecMulScalar(vmath.VecToGL(mdlBone.Header.Pos), float32(flagScale))),
+				Rotation:    vmath.FtoD4(vmath.QuatToGL(mdlBone.Header.Quat)),
+				Children:    make([]int, 0, 4),
+			}
+			if mdlBone.Header.ParentID >= 0 {
+				boneNodes[mdlBone.Header.ParentID].Children = append(boneNodes[mdlBone.Header.ParentID].Children, len(document.Nodes))
+			}
+			boneNodes[i] = node
+			document.Nodes = append(document.Nodes, node)
+		}
+	}
+
 	if len(m.MDL.BodyParts) > 0 {
 		positions := make([][3]float32, 0, len(m.VVD.Vertexes))
 		normals := make([][3]float32, 0, len(m.VVD.Vertexes))
@@ -31,11 +49,11 @@ func convert(n string) error {
 				vid := fixup.SourceVertexID
 				num := fixup.NumVertexes
 				for i := vid; i < vid+num; i++ {
-					p := vmath.Vec3ToGL(m.VVD.Vertexes[i].Position)
+					p := vmath.VecToGL(m.VVD.Vertexes[i].Position)
 					p = vmath.VecMulScalar(p, float32(flagScale))
 					positions = append(positions, p)
 
-					n := vmath.Vec3ToGL(m.VVD.Vertexes[i].Normal)
+					n := vmath.VecToGL(m.VVD.Vertexes[i].Normal)
 					normals = append(normals, n)
 
 					t := m.VVD.Vertexes[i].TexCoord
@@ -44,11 +62,11 @@ func convert(n string) error {
 			}
 		} else {
 			for _, v := range m.VVD.Vertexes {
-				p := vmath.Vec3ToGL(v.Position)
+				p := vmath.VecToGL(v.Position)
 				p = vmath.VecMulScalar(p, float32(flagScale))
 				positions = append(positions, p)
 
-				n := vmath.Vec3ToGL(v.Normal)
+				n := vmath.VecToGL(v.Normal)
 				normals = append(normals, n)
 
 				t := v.TexCoord

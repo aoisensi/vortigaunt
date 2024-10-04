@@ -6,6 +6,7 @@ type MDL struct {
 	Header *Header
 	Name   string
 
+	Bones       []*Bone
 	Textures    []*Texture
 	TextureDirs []string
 	Skins       [][]*Texture
@@ -26,7 +27,7 @@ type Header struct {
 	ViewBBMin     [3]float32
 	ViewBBMax     [3]float32
 
-	Flags uint32
+	Flags MDLFlags
 
 	BoneCount  int32
 	BoneOffset int32
@@ -97,6 +98,12 @@ type Header struct {
 	_                       int32
 }
 
+type MDLFlags uint32
+
+func (f MDLFlags) IsStaticProp() bool {
+	return f&1<<4 != 0 // https://github.com/ValveSoftware/source-sdk-2013/blob/0d8dceea4310fde5706b3ce1c70609d72a38efdf/sp/src/public/studio.h#L1965
+}
+
 func (d *Decoder) decodeMDL() (*MDL, error) {
 
 	d.mdl = new(MDL)
@@ -106,9 +113,18 @@ func (d *Decoder) decodeMDL() (*MDL, error) {
 		return nil, err
 	}
 	d.mdl.Header = header
+	d.mdl.Name = nameString(header.Name)
+
+	// Bones
+	err = d.ppush(
+		d.mdl.Header.BoneOffset,
+		func() error { return d.decodeBones(d.mdl) },
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	// Textures
-	d.mdl.Name = nameString(header.Name)
 	err = d.ppush(
 		d.mdl.Header.TextureOffset,
 		func() error { return d.decodeTexture(d.mdl) },
