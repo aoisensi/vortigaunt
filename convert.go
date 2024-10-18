@@ -26,8 +26,10 @@ func convert(n string) error {
 
 	var skinIndex *int
 
+	var isSkeletal = !m.MDL.Header.Flags.IsStaticProp()
+
 	// Bones
-	if !m.MDL.Header.Flags.IsStaticProp() {
+	if isSkeletal {
 		boneNodes := make([]*gltf.Node, len(m.MDL.Bones))
 		skin := &gltf.Skin{}
 		inverseBindMatrices := make([][4][4]float32, 0, len(m.MDL.Bones))
@@ -81,7 +83,7 @@ func convert(n string) error {
 		texcoords := make([][2]float32, 0, len(m.VVD.Vertexes))
 		var joints [][4]uint16
 		var weights [][4]float32
-		if skinIndex != nil {
+		if isSkeletal {
 			joints = make([][4]uint16, 0, len(m.VVD.Vertexes)*4)
 			weights = make([][4]float32, 0, len(m.VVD.Vertexes)*4)
 		}
@@ -102,7 +104,7 @@ func convert(n string) error {
 					t := v.TexCoord
 					texcoords = append(texcoords, [2]float32{t[0], t[1]})
 
-					if skinIndex != nil {
+					if isSkeletal {
 						joint := [4]uint16{}
 						weight := [4]float32{}
 						for j := 0; j < int(v.BoneWeight.NumBones); j++ {
@@ -142,7 +144,7 @@ func convert(n string) error {
 		normalID := modeler.WriteNormal(document, normals)
 		texcoordID := modeler.WriteTextureCoord(document, texcoords)
 		var jointID, weightID int
-		if skinIndex != nil {
+		if isSkeletal {
 			jointID = modeler.WriteJoints(document, joints)
 			weightID = modeler.WriteWeights(document, weights)
 		}
@@ -164,7 +166,7 @@ func convert(n string) error {
 						"NORMAL":     normalID,
 						"TEXCOORD_0": texcoordID,
 					}
-					if skinIndex != nil {
+					if isSkeletal {
 						attributes["JOINTS_0"] = jointID
 						attributes["WEIGHTS_0"] = weightID
 					}
