@@ -6,9 +6,11 @@ import (
 )
 
 var flagScale float64
+var flagWithLODs bool
 
 func init() {
 	flag.Float64Var(&flagScale, "scale", 0.02, "scale factor")
+	flag.BoolVar(&flagWithLODs, "with-lods", false, "export all LODs")
 	flag.Parse()
 }
 

@@ -1,7 +1,6 @@
 package vortigaunt
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
 
@@ -28,6 +27,8 @@ func convert(n string) error {
 
 	var isSkeletal = !m.MDL.Header.Flags.IsStaticProp()
 
+	usedLODs := false
+
 	// Bones
 	if isSkeletal {
 		boneNodes := make([]*gltf.Node, len(m.MDL.Bones))
@@ -53,7 +54,6 @@ func convert(n string) error {
 			combinedMatrix := vmath.MultiplyMat(vmath.InverseMat(parentIBM), localMatrix)
 
 			ibm := vmath.RoundMat(vmath.InverseMat(combinedMatrix))
-			fmt.Println(ibm[0][3], ibm[1][3], ibm[2][3], ibm[3][3])
 			inverseBindMatrices = append(inverseBindMatrices, ibm)
 
 			if mdlBone.Header.ParentID >= 0 {
@@ -151,55 +151,96 @@ func convert(n string) error {
 
 		for bpID, mdlBP := range m.MDL.BodyParts {
 			vtxBP := m.VTX.BodyParts[bpID]
-			node := &gltf.Node{
-				Name: mdlBP.Name,
-			}
-			mesh := &gltf.Mesh{
-				Name: mdlBP.Name,
-			}
+			nodes := make([]*gltf.Node, 0, 8)
+			meshes := make([]*gltf.Mesh, 0, 8)
 			for modelID, mdlModel := range mdlBP.Models {
 				vtxModel := vtxBP.Models[modelID]
-
-				for meshID, mdlMesh := range mdlModel.Meshes {
-					attributes := map[string]int{
-						"POSITION":   positionID,
-						"NORMAL":     normalID,
-						"TEXCOORD_0": texcoordID,
+				for lodIndex, lod := range vtxModel.LODs {
+					if !flagWithLODs && lodIndex > 0 {
+						continue
 					}
-					if isSkeletal {
-						attributes["JOINTS_0"] = jointID
-						attributes["WEIGHTS_0"] = weightID
+					if len(nodes) <= lodIndex {
+						nodes = append(nodes, &gltf.Node{
+							Name: mdlBP.Name,
+						})
+						meshes = append(meshes, &gltf.Mesh{
+							Name: mdlBP.Name,
+						})
 					}
-					primitive := &gltf.Primitive{
-						Attributes: attributes,
-					}
-					vtxMesh := vtxModel.LODs[0].Meshes[meshID]
-					indices := make([]uint16, 0, mdlMesh.Header.NumVertices)
-					for _, vtxSG := range vtxMesh.StripGroups {
-						for _, vtxStrip := range vtxSG.Strips {
-							for i := 0; i < int(vtxStrip.Header.NumIndices); i += 3 {
-								for _, j := range []int{0, 2, 1} {
-									idx1 := i + j + int(vtxStrip.Header.IndexOffset)
-									idx2 := vtxSG.Indices[idx1]
-									vertex := vtxSG.Vertexes[idx2]
-									idx3 := vertex.OriginalMeshVertexID
-									idx4 := int(mdlMesh.Header.VertexOffset) + int(idx3)
-									index := idx4 + int(mdlModel.Header.VertexIndex)/48
-									indices = append(indices, uint16(index))
+					for meshID, mdlMesh := range mdlModel.Meshes {
+						attributes := map[string]int{
+							"POSITION":   positionID,
+							"NORMAL":     normalID,
+							"TEXCOORD_0": texcoordID,
+						}
+						if isSkeletal {
+							attributes["JOINTS_0"] = jointID
+							attributes["WEIGHTS_0"] = weightID
+						}
+						primitive := &gltf.Primitive{
+							Attributes: attributes,
+						}
+						vtxMesh := lod.Meshes[meshID]
+						if mdlMesh.Header.NumVertices == 0 {
+							continue
+						}
+						indices := make([]uint16, 0, mdlMesh.Header.NumVertices)
+						for _, vtxSG := range vtxMesh.StripGroups {
+							for _, vtxStrip := range vtxSG.Strips {
+								for i := 0; i < int(vtxStrip.Header.NumIndices); i += 3 {
+									for _, j := range []int{0, 2, 1} {
+										idx1 := i + j + int(vtxStrip.Header.IndexOffset)
+										idx2 := vtxSG.Indices[idx1]
+										vertex := vtxSG.Vertexes[idx2]
+										idx3 := vertex.OriginalMeshVertexID
+										idx4 := int(mdlMesh.Header.VertexOffset) + int(idx3)
+										index := idx4 + int(mdlModel.Header.VertexIndex)/48
+										indices = append(indices, uint16(index))
+									}
 								}
 							}
 						}
+						if len(indices) == 0 {
+							continue
+						}
+						primitive.Indices = gltf.Index(modeler.WriteIndices(document, indices))
+						meshes[lodIndex].Primitives = append(meshes[lodIndex].Primitives, primitive)
 					}
-					primitive.Indices = gltf.Index(modeler.WriteIndices(document, indices))
-					mesh.Primitives = append(mesh.Primitives, primitive)
 				}
 			}
-			document.Meshes = append(document.Meshes, mesh)
-			node.Mesh = gltf.Index(len(document.Meshes) - 1)
-			node.Skin = skinIndex
-			document.Nodes = append(document.Nodes, node)
-			scene.Nodes = append(scene.Nodes, len(document.Nodes)-1)
+			var rootLODNodeIndex *int
+			lodsIndexes := make([]int, 0, 8)
+			for i, node := range nodes {
+				mesh := meshes[i]
+				if mesh.Primitives == nil {
+					continue
+				}
+
+				document.Meshes = append(document.Meshes, mesh)
+				node.Mesh = gltf.Index(len(document.Meshes) - 1)
+				node.Skin = skinIndex
+				document.Nodes = append(document.Nodes, node)
+				nodeIndex := len(document.Nodes) - 1
+				scene.Nodes = append(scene.Nodes, nodeIndex)
+				if rootLODNodeIndex == nil {
+					rootLODNodeIndex = &nodeIndex
+				} else {
+					lodsIndexes = append(lodsIndexes, nodeIndex)
+				}
+			}
+			if len(lodsIndexes) > 0 {
+				document.Nodes[*rootLODNodeIndex].Extensions = map[string]any{
+					"MSFT_lod": map[string]any{
+						"ids": lodsIndexes,
+					},
+				}
+				usedLODs = true
+			}
 		}
+	}
+	if usedLODs {
+		document.ExtensionsUsed = append(document.ExtensionsUsed, "MSFT_lod")
+		document.ExtensionsRequired = append(document.ExtensionsRequired, "MSFT_lod")
 	}
 
 	gltfName := strings.TrimSuffix(n, ".mdl") + ".gltf"
