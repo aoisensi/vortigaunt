@@ -27,6 +27,13 @@ func convert(n string) error {
 
 	var isSkeletal = !m.MDL.Header.Flags.IsStaticProp()
 
+	if flagForceStatic {
+		isSkeletal = false
+	}
+	if flagForceSkeletal {
+		isSkeletal = true
+	}
+
 	usedLODs := false
 
 	// Bones
