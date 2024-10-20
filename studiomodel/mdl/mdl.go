@@ -10,6 +10,7 @@ type MDL struct {
 	Textures    []*Texture
 	TextureDirs []string
 	Skins       [][]*Texture
+	AnimDescs   []*AnimDesc
 	BodyParts   []*BodyPart
 }
 
@@ -167,6 +168,15 @@ func (d *Decoder) decodeMDL() (*MDL, error) {
 		}
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	// AnimDescs
+	err = d.ppush(
+		d.mdl.Header.LocalAnimOffset,
+		func() error { return d.decodeAnimDesc(d.mdl) },
+	)
 	if err != nil {
 		return nil, err
 	}

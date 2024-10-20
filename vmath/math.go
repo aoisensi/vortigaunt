@@ -112,8 +112,8 @@ func InverseMat(m [4][4]float32) [4][4]float32 {
 	}
 
 	det = 1.0 / det
-	for i := 0; i < 4; i++ {
-		for j := 0; j < 4; j++ {
+	for i := range 4 {
+		for j := range 4 {
 			inv[i][j] *= det
 		}
 	}
