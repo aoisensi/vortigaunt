@@ -1,5 +1,6 @@
 package mdl
 
+// mstudiobodyparts_t
 type BodyPart struct {
 	Header *BodyPartHeader
 	Name   string

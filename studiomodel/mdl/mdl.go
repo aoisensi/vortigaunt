@@ -2,6 +2,7 @@ package mdl
 
 import "encoding/binary"
 
+// studiohdr_t
 type MDL struct {
 	Header *Header
 	Name   string

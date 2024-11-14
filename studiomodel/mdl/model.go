@@ -1,5 +1,6 @@
 package mdl
 
+// mstudiomodel_t
 type Model struct {
 	Header *ModelHeader
 	Name   string

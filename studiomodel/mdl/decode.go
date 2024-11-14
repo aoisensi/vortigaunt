@@ -34,10 +34,10 @@ func (d *Decoder) Decode() (*MDL, error) {
 func (d *Decoder) ppush(p int32, f func() error) error {
 	o, _ := d.r.Seek(0, io.SeekCurrent)
 	d.r.Seek(int64(p), io.SeekCurrent)
+	defer d.r.Seek(o, io.SeekStart)
 	if err := f(); err != nil {
 		return err
 	}
-	d.r.Seek(o, io.SeekStart)
 	return nil
 }
 
