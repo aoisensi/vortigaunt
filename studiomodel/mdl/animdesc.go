@@ -3,7 +3,6 @@ package mdl
 import (
 	"errors"
 	"fmt"
-	"io"
 	"log"
 )
 
@@ -48,9 +47,8 @@ type AnimDescHeader struct {
 func (d *Decoder) decodeAnimDesc(mdl *MDL) error {
 	mdl.AnimDescs = make([]*AnimDesc, 0, mdl.Header.LocalAnimCount)
 
-	for i := range mdl.Header.LocalAnimCount {
+	for range mdl.Header.LocalAnimCount {
 		header := new(AnimDescHeader)
-		ptr, _ := d.r.Seek(0, io.SeekCurrent)
 
 		if err := d.read(header); err != nil {
 			return fmt.Errorf("vortigaunt: decodeAnimDesc: %w", err)
@@ -59,14 +57,6 @@ func (d *Decoder) decodeAnimDesc(mdl *MDL) error {
 		ad.Header = header
 
 		ad.Name = d.readName(ad.Header.NameOffset - 100)
-		fmt.Println()
-		fmt.Println(ad.Name)
-		fmt.Println(i)
-		fmt.Println("Ptr:", ptr)
-		fmt.Println("AnimBlock:", ad.Header.AnimBlock)
-		fmt.Println("AnimOffset:", ad.Header.AnimOffset)
-		fmt.Println("NumFrames:", header.NumFrames)
-		fmt.Println("SectionFrameCount:", ad.Header.SectionFrameCount)
 		if header.SectionFrameCount == 0 {
 			err := d.ppush(
 				header.AnimOffset-100,
@@ -85,8 +75,6 @@ func (d *Decoder) decodeAnimDesc(mdl *MDL) error {
 			}
 		} else {
 			sections := int(header.NumFrames/header.SectionFrameCount) + 2 // https://github.com/ValveSoftware/source-sdk-2013/blob/master/mp/src/public/studio.cpp#L111
-
-			fmt.Println("Sections:", sections)
 			if err := d.ppush(
 				header.SectionOffset-100,
 				func() error {
@@ -106,7 +94,6 @@ func (d *Decoder) decodeAnimDesc(mdl *MDL) error {
 
 			ad.Anims = make([]*Anim, 0, sections)
 			for si, as := range ad.AnimSections {
-				fmt.Println("S:", si)
 				framesCount := int(header.SectionFrameCount) + 1
 				if si >= sections-2 {
 					framesCount = int(header.NumFrames) - (sections-2)*int(header.SectionFrameCount)

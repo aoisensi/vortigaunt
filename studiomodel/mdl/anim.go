@@ -48,7 +48,6 @@ func (d *Decoder) decodeAnim(frames int) (*Anim, error) {
 		}
 	}
 	var err error
-	// fmt.Println("AnimType:", anim.AnimType)
 	if anim.AnimType&AnimTypeRawRot2 > 0 {
 		anim.RawRot, err = d.quat64()
 		if err != nil {

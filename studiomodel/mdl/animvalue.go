@@ -2,7 +2,6 @@ package mdl
 
 import (
 	"fmt"
-	"io"
 )
 
 var errFailedToReadAnimValueForBadFrames = fmt.Errorf("vortigaunt: failed to read anim value for bad frames")
@@ -19,7 +18,6 @@ type AnimValue struct {
 }
 
 func (d *Decoder) decodeAnimValuePtr(frames int) (*AnimValuePtr, error) {
-	fmt.Println("decodeAnimValuePtr frames:", frames)
 	ptr := new(AnimValuePtr)
 	if err := d.read(&ptr.Offsets); err != nil {
 		return nil, fmt.Errorf("vortigaunt: decodeAnimValuePtr: %w", err)
@@ -35,15 +33,10 @@ func (d *Decoder) decodeAnimValuePtr(frames int) (*AnimValuePtr, error) {
 			int32(offset)-6,
 			func() error {
 				i := 0
-				ptr, _ := d.r.Seek(0, io.SeekCurrent)
-				fmt.Printf("pointer: 0x%x\n", ptr)
 				for {
 					if i == frames {
-						// fmt.Println()
-						fmt.Println("Success")
 						return nil
 					} else if i > frames {
-						fmt.Println("Failed read anim value 1")
 						return errFailedToReadAnimValueForBadFrames
 						// return nil
 					}
@@ -52,10 +45,8 @@ func (d *Decoder) decodeAnimValuePtr(frames int) (*AnimValuePtr, error) {
 						return fmt.Errorf("vortigaunt: decodeAnimValuePtr: %w", err)
 					}
 					if vt.Total == 0 {
-						fmt.Println("Failed read anim value 2")
 						return errFailedToReadAnimValueForBadFrames
 					}
-					// fmt.Print(vt, " ")
 					for range int(vt.Valid) {
 						var v int16
 						if err := d.read(&v); err != nil {
