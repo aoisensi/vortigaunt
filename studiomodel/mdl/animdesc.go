@@ -42,7 +42,7 @@ type AnimDescHeader struct {
 	ZeroFrameCount        int16
 	ZeroFrameIndex        int32
 	ZeroFramesTallTime    float32
-}
+} // 100 bytes
 
 func (d *Decoder) decodeAnimDesc(mdl *MDL) error {
 	mdl.AnimDescs = make([]*AnimDesc, 0, mdl.Header.LocalAnimCount)

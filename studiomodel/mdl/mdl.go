@@ -1,6 +1,8 @@
 package mdl
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+)
 
 // studiohdr_t
 type MDL struct {
@@ -12,6 +14,7 @@ type MDL struct {
 	TextureDirs []string
 	Skins       [][]*Texture
 	AnimDescs   []*AnimDesc
+	SecDescss   []*SeqDesc
 	BodyParts   []*BodyPart
 }
 
@@ -174,11 +177,18 @@ func (d *Decoder) decodeMDL() (*MDL, error) {
 	}
 
 	// AnimDescs
-	err = d.ppush(
+	if err := d.ppush(
 		d.mdl.Header.LocalAnimOffset,
 		func() error { return d.decodeAnimDesc(d.mdl) },
-	)
-	if err != nil {
+	); err != nil {
+		return nil, err
+	}
+
+	// SecDescs
+	if err := d.ppush(
+		d.mdl.Header.LocalSeqOffset,
+		func() error { return d.decodeSeqDescs(d.mdl) },
+	); err != nil {
 		return nil, err
 	}
 
